@@ -1,5 +1,6 @@
 # NYC Realty Estate Analysis
 
+
 💻 **Programming Language:** R, Advanced Excel, SQL <br>
 📚 **Libraries:** tidyverse, lubridate, dplyr, DBI, odbc, Excel Solver <br>
 📌 **Professional Ability:** Connect db, JOIN TABLE, Data Cleaning, Exploratory Data Analysis, Data Visualization, Correlation Analysis, Data Modeling, Time Series, Regression Forecast <br>
