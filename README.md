@@ -5,7 +5,7 @@
 📌 **Professional Ability:** Connect db, JOIN TABLE, Data Cleaning, Exploratory Data Analysis, Data Visualization, Correlation Analysis, Data Modeling, Time Series, Regression Forecast <br>
 <br>
 
-## Description
+## Executive Summary
 
 This analysis report aims to determine the feasibility of establishing a real estate firm in the Baychester District of New York. To accomplish this, I utilized NYC Real Estate SQL data, along with tools such as R Studio, Power BI, and Advanced Excel. The report follows a comprehensive approach, beginning with descriptive analytics for data exploration, followed by predictive analytics using Time Series and Regression forecast models to predict future sales performance. Finally, prescriptive analytics utilizing Excel Solver is employed to assess the profitability of opening an office.<br>
 Historical data shows residential sales in Baychester significantly surpass commercial sales: $120.7 million versus $29.76 million. Using a regression forecasting model, we projected residential sales for the next eight quarters (2022-2023), expecting approximately $1,093,024 in revenue. However, considering costs (initial investment, office space, labor, marketing), our estimated net present value of profit is around $430,000, with a 65% return on investment. Opening a Baychester office, focusing on residential sales, appears favorable. Practical aspects include limited manpower with only three employees and the need for in-depth risk analysis before making a final decision.<br>
