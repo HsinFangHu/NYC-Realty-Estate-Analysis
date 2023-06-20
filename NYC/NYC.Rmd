@@ -1,0 +1,165 @@
+---
+title: "NYC"
+author: "Hsin Fang Hu"
+date: "2023-06-03"
+output: html_document
+---
+
+## Descriptive Analytics
+
+#### Connect to the database
+```{r, message=FALSE, warning=FALSE}
+install.packages("dplyr")
+install.packages("DBI")
+install.packages("odbc")
+install.packages("tidyverse")
+install.packages("lubridate")
+library(dplyr)
+library(DBI)
+library(odbc)
+library(tidyverse)
+library(lubridate)
+con<-dbConnect(odbc(),
+               Driver = "SQL Server",
+               Server = "met-sql19.bu.edu",
+               Database = "NYC Real Estate")
+
+BDC<-dbReadTable(conn=con,
+                 name="BUILDING_CLASS") %>%
+  select(1,3)
+NBH<-dbReadTable(conn=con,
+                 name="NEIGHBORHOOD") %>%
+  select(1,2)
+NYCT<-dbReadTable(conn=con,
+                  name="NYC_TRANSACTION_DATA") %>%
+  select(2,3,9,11,12)
+BOR<-dbReadTable(conn=con,
+                 name="BOROUGH") 
+
+colnames(NYCT)[2]<-'X.BUILDING_CODE_ID'
+
+maintable<-NYCT %>%
+  left_join(NBH) %>%
+  left_join(BDC) %>%
+  select(3,4,5,6,7)
+
+rm(list=c('BR', 'BDC', 'NBH', 'NYCT'))
+```
+<br>
+The datasets are in the Boston University MET Lab SQL Server, so I first establish a connection to this "NYC Real Estate" database, hosted at "met-sql19.bu.edu". Then I extract data from 4 tables. After that, the transformed data is loaded into a new data frame by using left join functions. <br>
+
+#### Cleaning Data - Remove 0
+```{r, message=FALSE, warning=FALSE}
+BaychesterRT<-maintable %>%
+  filter(NEIGHBORHOOD_NAME=="BAYCHESTER", TYPE=="RESIDENTIAL", GROSS_SQUARE_FEET>0, SALE_PRICE>0)%>%
+  group_by(SALE_DATE= year(SALE_DATE)) %>%
+  summarise(Averageprice=sum(SALE_PRICE)/sum(GROSS_SQUARE_FEET), Totalsaleprice=sum(SALE_PRICE))
+```
+<br>
+In this step, I added the description that the sale price and sum of all areas must be greater than zero in the filter:
+*filter(NEIGHBORHOOD_NAME=="BAYCHESTER", TYPE=="RESIDENTIAL", GROSS_SQUARE_FEET>0, SALE_PRICE>0)*
+<br>
+From the table above, it can be seen that I accurately calculated the average price of one square foot of real estate and the total sale price.<br>
+
+#### Compare Baychester with Williams Bridge and Kips Bay 
+```{r, message=FALSE, warning=FALSE}
+Comparison<-maintable %>%
+  filter(TYPE=="RESIDENTIAL", GROSS_SQUARE_FEET>0, SALE_PRICE>0, NEIGHBORHOOD_NAME %in%
+           c('BAYCHESTER','WILLIAMSBRIDGE','KIPS BAY')) %>%
+  group_by(SALE_DATE= year(SALE_DATE),NEIGHBORHOOD_NAME) %>%
+  summarise(Averageprice=sum(SALE_PRICE)/sum(GROSS_SQUARE_FEET), Totalsaleprice=sum(SALE_PRICE))
+
+ggplot(Comparison)+
+  geom_line(mapping = aes(x=SALE_DATE,
+                          y=Averageprice,
+                          color=NEIGHBORHOOD_NAME),
+            size=1)+
+  scale_color_manual(values=c('#F8766D','#619CFF','#00BA38'))+
+  theme_classic()
+```
+<br>
+I picked two nearby neighborhoods. In terms of location, Williams Bridge is right next to Baychester. In terms of total sales price, Kips Bay was the top five sales hotspot. I'd like to see what sales are near Baychester; also compare the top sales areas, which is why I chose these two locations in particular.<br>
+It can be seen from the chart that the average price of one square foot in Baychester and Williams Bridge is similar. It can be explained that the price level in this area may be the case. And Kips Bay's average price of one square foot can be clearly seen as much higher than Baychester and Williams Bridge's. This comparison chart can give supervisors a good basis for decision-making.<br>
+
+#### Compare Baychester with Kips Bay (T-test)
+```{r, message=FALSE, warning=FALSE}
+BaychesterRT<-maintable %>%
+  filter(NEIGHBORHOOD_NAME=="BAYCHESTER", TYPE=="RESIDENTIAL", GROSS_SQUARE_FEET>0, SALE_PRICE>0)
+KipsbayRT<-maintable %>%
+  filter(NEIGHBORHOOD_NAME=="KIPS BAY", TYPE=="RESIDENTIAL", GROSS_SQUARE_FEET>0, SALE_PRICE>0)
+t.test(x=KipsbayRT$SALE_PRICE, y=BaychesterRT$SALE_PRICE, alternative = "t", conf.level = .95)
+```
+<br>
+In T-test, I use "t" to run the code. We can see that Kips Bay's sales price and Bay Chester's sales price have different level. From the mean of these two area, we know that Kips Bay's sales price is much higher than Bay Chester. We understand that still have another neighborhood's sale price is higher, so it seems that Bay Chester is not the best place to open a real estate office.<br>
+
+## Predictive Analytics
+
+#### Time Series
+```{r, message=FALSE, warning=FALSE}
+BaychesterRT<-maintable %>%
+  filter(NEIGHBORHOOD_NAME=="BAYCHESTER", TYPE=="RESIDENTIAL", 
+         GROSS_SQUARE_FEET>0, SALE_PRICE>0) %>%
+  mutate(Total_sales=sum(SALE_PRICE))
+
+BaychesterRT2<-BaychesterRT %>%
+  mutate(Yr=year(SALE_DATE), Qt=quarter(SALE_DATE)) %>%
+  filter(Yr>2008) %>%
+  group_by(Yr,Qt) %>%
+  summarise(Total_sales=sum(SALE_PRICE))
+
+SP_ts<-ts(data = BaychesterRT2$Total_sales,
+          start=2009,
+          frequency = 4)
+
+m<-ets(y=SP_ts,
+       model = 'ZMN')
+forecast(m,8)
+forecast(m,8) %>% plot()
+```
+<br>
+At the beginning, I made a filter according to the requirements of the title, and chose to start from 2009. After making sales line chart, I find that the sales volume presents multiplicative trend, which is slightly curved, and none seasonality. Therefore, I put "M" for trend and "N" for seasonality to analyze. For the error type, I use "Z" to let the R choose. <br>
+The numbers predicted by the time series can be referred to the following table, which shows the forecast numbers, and confidence bands for the next 8 quarters. It can be seen that the sales number predicted by the time series is downward. This may be because historically, residential sales in 2020 began to decline due to the impact of the epidemic and it reflected in the forecast.<br>
+
+#### Regression Forecast 
+```{r, message=FALSE, warning=FALSE}
+BaychesterRT3<-maintable %>%
+  mutate(Qt=quarter(SALE_DATE, type = 'year.quarter')) %>%
+  filter(NEIGHBORHOOD_NAME=="BAYCHESTER", TYPE=="RESIDENTIAL",
+         GROSS_SQUARE_FEET>0, SALE_PRICE>0, Qt>2008.4) %>%
+  group_by(Qt) %>%
+  summarise(Total_sales=sum(SALE_PRICE)) %>%
+  mutate(pd=1:52,
+         qtr=c('Q1','Q2','Q3','Q4') %>%rep(13)) %>%
+  select(-Qt)
+
+#time & quarter
+m2<-lm(formula=Total_sales~.,
+       data=BaychesterRT3)
+summary(m2)
+#time
+m3<-lm(formula=Total_sales~pd,
+       data=BaychesterRT3)
+summary(m3)
+```
+<br>
+**Including Both Time and Seasonality** <br>
+The model equation is:<br>
+*Y=7738285 + 559533 X_1 + 2951847 X_2 - 414462 X_3 + 191677 X_4*<br>
+As we can see at the significance row of "pd", time variable is very important, which is really small (5.72e-12). However, the quarter might not be so important. Because non of its significance row is smaller than 0.05. The multiple R squared is 0.64 and adjusted R squared is 0.61. Adjusted R squared tells us whether the model does a good job of explaining the variance in comparison to the total variance. And a R squared value of 0.64 means that 64% of the variance can be explained or predicted using the predictors we see as coefficients.<br>
+<br>
+**Including Time Only** <br>
+The model equation is:<br>
+*Y = 8461599 + 557984 X_1*<br>
+After deleting the quarter, now we can see the significance row of "pd" become smaller than before, and we also have a slightly better adjusted R squared which is 0.62.<br>
+
+#### Compare Regression Forecast with Time Series
+```{r, message=FALSE, warning=FALSE}
+#predict by time & quarter
+x2<-data.frame(pd=c(53,54,55,56),Total_sales=c(0,0,0,0),qtr=c('Q1','Q2','Q3','Q4'))
+predict.lm(m2,x2,interval = "confidence")
+#predict by time
+x3<-data.frame(pd=c(53,54,55,56),Total_sales=c(0,0,0,0),qtr=c('Q1','Q2','Q3','Q4'))
+predict.lm(m3,x3,interval = "confidence")
+```
+<br>
+As we can see in the table, both of this two regression models think that sales are going up, while when we go back to time series analysis, it thinks that sales were going down. So the reason for that is because the sales started by going up, and then ended by going down. The regression model doesn't weigh newer data entries more heavily than older, whereas the time series model does.<br>
