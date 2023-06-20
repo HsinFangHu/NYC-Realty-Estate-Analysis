@@ -1,5 +1,5 @@
 # NYC Realty Estate Analysis
-
+<br>
 
 💻 **Programming Language:** R, Advanced Excel, SQL <br>
 📚 **Libraries:** tidyverse, lubridate, dplyr, DBI, odbc, Excel Solver <br>
